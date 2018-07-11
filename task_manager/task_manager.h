@@ -17,18 +17,15 @@ struct ITask {
 
 template <class F, class Arg>
 struct Task : public ITask<Arg> {
- private:
   F f;
 
- public:
   using argument_t = Arg;
   using functor_t = F;
   using result_t = typename std::result_of<F(Arg)>::type;
 
- private:
+
   std::unique_ptr<ITask<result_t>> child;
 
- public:
   Task(F f) : f(f) {}
   void Run(Arg arg) override {
     auto res = f(std::move(arg));
@@ -36,6 +33,7 @@ struct Task : public ITask<Arg> {
       child->Run(std::move(res));
     }
   }
+  Task(Task&&) = default;
 
   template <class G>
   void Link(G g) {
@@ -46,10 +44,25 @@ struct Task : public ITask<Arg> {
 template <class F, class Arg>
 struct TaskBuilder {
   TaskBuilder(Task<F, Arg> task) : task(std::move(task)) {}
+
+  TaskBuilder(TaskBuilder&&) = default;
+
+ private:
   Task<F, Arg> task;
 
-  //template <class G>
-  //TaskBuilder<Task<G, T::result_t>> Then(G g) {}
+ public:
+
+  using argument_t = Arg;
+  using functor_t = F;
+  using result_t = typename Task<F, Arg>::result_t;
+
+  template <class G>
+  void Then(G g) {
+    using arg_local_t = result_t;
+    using result_local_t = typename std::result_of<G(arg_local_t)>::type;
+    using task_local_t = Task<G, arg_local_t>;
+    task.child.reset(new task_local_t(std::move(g)));
+  }
 
   ~TaskBuilder() {
     task.Run(666);
@@ -60,7 +73,7 @@ template <class F, class Arg>
 decltype(auto) PostTask(F f, Arg arg) {
   using result = decltype(f(arg));
   using task_t = Task<F, Arg>;
-  return std::move(TaskBuilder<F, Arg>(task_t(std::move(f))));
+  return TaskBuilder<F, Arg>(task_t(std::move(f)));
 }
 
 }  // namespace task

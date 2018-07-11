@@ -12,16 +12,21 @@ int main() {
     return i + 1;
   };
 
-  cout << "Test 1" << endl << endl;
+ /* cout << "Test 1" << endl << endl;
   Task<decltype(lambda), int> task(lambda);
   task.Run(0);
 
   cout << "Test 2" << endl << endl;
   task.Link(lambda);
-  task.Run(0);
+  task.Run(0);*/
 
   cout << "Test 3 PostTask" << endl << endl;
-  PostTask(lambda, 13);//.Then([](int i) { return i + 1; })
+  {
+    PostTask(lambda, 13).Then([](int i) {
+    cout << "Run2 i = " << i << endl;
+      return i + 1;
+    });
+  }
 
   getchar();
   return 0;
