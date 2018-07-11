@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 
+#include "task_holder.h"
 // TODO: Reference additional headers your program requires here.
 
 namespace task {
@@ -43,12 +44,13 @@ struct Task : public ITask<Arg> {
 
 template <class F, class Arg>
 struct TaskBuilder {
-  TaskBuilder(Task<F, Arg> task) : task(std::move(task)) {}
+  TaskBuilder(TaskHolder& th, Task<F, Arg> task) : th(th), task(std::move(task)) {}
 
   TaskBuilder(TaskBuilder&&) = default;
 
  private:
   Task<F, Arg> task;
+  TaskHolder th;
 
  public:
 
@@ -69,11 +71,16 @@ struct TaskBuilder {
   }
 };
 
+template <class F>
+decltype(auto) PostTask(TaskHolder& th, F f) {
+  using task_t = Task<F, void>;
+  return TaskBuilder<F, void>(th, task_t(std::move(f)));
+}
+
 template <class F, class Arg>
-decltype(auto) PostTask(F f, Arg arg) {
-  using result = decltype(f(arg));
+decltype(auto) PostTask(TaskHolder& th, F f, Arg arg) {
   using task_t = Task<F, Arg>;
-  return TaskBuilder<F, Arg>(task_t(std::move(f)));
+  return TaskBuilder<F, Arg>(th, task_t(std::move(f)));
 }
 
 }  // namespace task
