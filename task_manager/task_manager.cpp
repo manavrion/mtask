@@ -8,13 +8,41 @@
 using namespace std;
 using namespace task;
 
-struct SimpleTaskHolderer : public TaskHolder {};
-
-SimpleTaskHolderer Holder;
+TaskHolder SimpleTHolder;
 
 int main() {
-  PostTask(Holder, []() { cout << "Simple task" << endl;
+  PostTask(SimpleTHolder, []() { 
+    cout << "TEST 1 : Simple task" << endl; 
   });
+
+  PostTask(SimpleTHolder, []() -> int {
+    cout << "TEST 2 : Task stage 1" << endl;
+    return 0;
+  }).Then([](int i) { 
+    cout << "TEST 2 : Task stage 2" << endl; 
+  });
+
+  PostTask(SimpleTHolder, [](int i, int j, int k) {
+    if (i != 1 || j != 2 || k != 3) {
+      cout << "ERROR !\n";
+    }
+    cout << "TEST 3 : Task stage 1" << endl;
+    return 4;
+  }, 1, 2, 3).Then([](int i) {
+    if (i != 4) {
+      cout << "ERROR !\n";
+    }
+    cout << "TEST 3 : Task stage 2" << endl;
+    return 5;
+  }).Then([](int i) {
+    if (i != 5) {
+      cout << "ERROR !\n";
+    }
+    cout << "TEST 3 : Task stage 3" << endl;
+  });
+
+
+  
 
 #if 0
 
