@@ -5,82 +5,127 @@
 
 #include <iostream>
 #include <memory>
+#include <tuple>
 
-#include "task_holder.h"
 // TODO: Reference additional headers your program requires here.
 
 namespace task {
 
-template <class Arg>
+// Tasks wrappers, contains also queued task
+
+template <class Res, class... Args>
+struct IFunctor {
+  using result_t = Res;
+  using arguments_t = std::tuple<Args...>;
+
+  virtual result_t Get(Args... args) = 0;
+  virtual result_t Get(arguments_t args) = 0;
+};
+
+template <class F, class Res, class... Args>
+struct Functor {
+  using functor_t = F;
+  using result_t = Res;
+  using arguments_t = std::tuple<Args...>;
+
+  functor_t f;
+
+  Functor(F f) : f(std::move(f)) {}
+  Functor(Functor&&) = default;
+
+  result_t Get(Args... args) { return f(std::move(args)...); }
+  result_t Get(arguments_t args) {
+    return std::apply(std::move(f), std::move(args));
+  }
+};
+
+template <class... Args, class F>
+decltype(auto) CreateFunctor(F f) {
+  using result_t = typename std::result_of<F(Args...)>::type;
+  using task_t = Functor<F, result_t, Args...>;
+  return task_t(std::move(f));
+}
+
+// type of tasks node:
+// 1 - start node to end node: contain args, result is void    ||  <class F,
+// void, class... Args> 2 - start node to node: contain args, launch other node
+// ||  <class F, class Res, class... Args> 4 - end node: result is void ||
+// <class F, void, class... Args> 3 - node ||  <class F, class Res, class...
+// Args>
+
+
+// 3 and 4 implement INode
+template <class... Args>
+struct INode {
+  using arguments_t = std::tuple<Args...>;
+  virtual void Run(arguments_t) = 0;
+};
+
+// 1 and 2 implement ITask
 struct ITask {
-  virtual void Run(Arg arg) = 0;
+  virtual void Run() = 0;
 };
 
-template <class F, class Arg>
-struct Task : public ITask<Arg> {
-  F f;
+// nodes
 
-  using argument_t = Arg;
+template <class F, class Res, class... Args>
+struct TaskNode : INode<Args...> {
   using functor_t = F;
-  using result_t = typename std::result_of<F(Arg)>::type;
+  using result_t = Res;
+  using arguments_t = std::tuple<Args...>;
 
+  functor_t f;
 
-  std::unique_ptr<ITask<result_t>> child;
+  TaskNode(functor_t f) : f(std::move(f)) {}
 
-  Task(F f) : f(f) {}
-  void Run(Arg arg) override {
-    auto res = f(std::move(arg));
-    if (child) {
-      child->Run(std::move(res));
-    }
-  }
-  Task(Task&&) = default;
-
-  template <class G>
-  void Link(G g) {
-    child.reset(new Task<G, result_t>(g));
-  }
+  void Run(arguments_t args) final override {}
 };
 
-template <class F, class Arg>
-struct TaskBuilder {
-  TaskBuilder(TaskHolder& th, Task<F, Arg> task) : th(th), task(std::move(task)) {}
-
-  TaskBuilder(TaskBuilder&&) = default;
-
- private:
-  Task<F, Arg> task;
-  TaskHolder th;
-
- public:
-
-  using argument_t = Arg;
+template <class F, class... Args>
+struct TaskNode<F, void, Args...> : INode<Args...> {
   using functor_t = F;
-  using result_t = typename Task<F, Arg>::result_t;
+  using result_t = void;
+  using arguments_t = std::tuple<Args...>;
 
-  template <class G>
-  void Then(G g) {
-    using arg_local_t = result_t;
-    using result_local_t = typename std::result_of<G(arg_local_t)>::type;
-    using task_local_t = Task<G, arg_local_t>;
-    task.child.reset(new task_local_t(std::move(g)));
-  }
+  functor_t f;
 
-  ~TaskBuilder() {
-    task.Run(666);
-  }
+  TaskNode(functor_t f) : f(std::move(f)) {}
+
+  void Run(arguments_t args) final override {}
 };
 
-template <class F>
-decltype(auto) PostTask(TaskHolder& th, F f) {
-  using task_t = Task<F, void>;
-  return TaskBuilder<F, void>(th, task_t(std::move(f)));
-}
+// starters
 
-template <class F, class Arg>
-decltype(auto) PostTask(TaskHolder& th, F f, Arg arg) {
-  using task_t = Task<F, Arg>;
-  return TaskBuilder<F, Arg>(th, task_t(std::move(f)));
-}
+template <class F, class Res, class... Args>
+struct Task {
+  using functor_t = F;
+  using result_t = Res;
+  using arguments_t = std::tuple<Args...>;
+  using child_t = std::unique_ptr<INode<Args...>>;
+
+  functor_t f;
+  
+  arguments_t args;
+
+  Task(functor_t f, arguments_t args)
+      : f(std::move(f)), args(std::move(args)) {}
+
+  void Run() final override {}
+};
+
+template <class F, class... Args>
+struct Task<F, void, Args...> : ITask {
+  using functor_t = F;
+  using result_t = void;
+  using arguments_t = std::tuple<Args...>;
+
+  functor_t f;
+  arguments_t args;
+
+  Task(functor_t f, arguments_t args)
+      : f(std::move(f)), args(std::move(args)) {}
+
+  void Run() final override { std::apply(std::move(f), std::move(args)); }
+};
 
 }  // namespace task
