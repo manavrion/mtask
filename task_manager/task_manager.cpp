@@ -39,7 +39,12 @@ int main() {
       cout << "pre II test 1/4" << endl;
       return make_tuple(1, 2);
     };
-    auto f2 = [](int i, int j) { cout << "pre II test 2/4" << endl; };
+    auto f2 = [](int i, int j) {
+      cout << "pre II test 2/4" << endl;
+      return make_tuple(3, 4);
+    };
+    auto f3 = [](int i, int j) { cout << "pre II test 2/4" << endl; };
+
     TaskNode<decltype(f1), ArgPack<>, ResPack<int, int>> tn1(move(f1));
     tn1.child_ptr.reset(
         new TaskNode<decltype(f2), ArgPack<int, int>, ResPack<>>(move(f2)));
@@ -91,11 +96,31 @@ int main() {
       cout << "pre III test 5/8" << endl;
       return make_tuple(1, 2);
     };
-    auto f2 = [](int i, int j) { cout << "pre III test 6/8" << endl; };
+    auto f2 = [](int i, int j) {
+      cout << "pre III test 6/8   1" << endl;
+      return make_tuple(1, 2);
+    };
+    auto f3 = [](int i, int j) {
+      cout << "pre III test 6/8   2" << endl;
+      return make_tuple(1, 2);
+    };
+    auto f4 = [](int i, int j) { cout << "pre III test 6/8   3" << endl; };
+
     StarterTaskNode<decltype(f1), ArgPack<>, ResPack<int, int>> tn1(move(f1),
                                                                     {});
-    tn1.child_ptr.reset(
-        new TaskNode<decltype(f2), ArgPack<int, int>, ResPack<>>(move(f2)));
+
+    auto p2 = new TaskNode<decltype(f2), ArgPack<int, int>, ResPack<int, int>>(
+        move(f2));
+    auto p3 = new TaskNode<decltype(f3), ArgPack<int, int>, ResPack<int, int>>(
+        move(f3));
+    auto p4 =
+        new TaskNode<decltype(f4), ArgPack<int, int>, ResPack<>>(move(f4));
+
+    p2->child_ptr.reset(p3);
+    p3->child_ptr.reset(p4);
+
+    tn1.child_ptr.reset(p2);
+
     tn1.Run();
   }
 
@@ -107,16 +132,115 @@ int main() {
       return Bar{};
     };
     auto f2 = [](Bar i) { cout << "pre III test 8/8" << endl; };
+
     StarterTaskNode<decltype(f1), ArgPack<>, ResPack<Bar>> tn1(move(f1), {});
     tn1.child_ptr.reset(
         new TaskNode<decltype(f2), ArgPack<Bar>, ResPack<>>(move(f2)));
     tn1.Run();
   }
 
+  int counter = 0;
+  {
+    TaskHolder SimpleTHolder;
+    {
+      auto f1_1 = [&]() {
+        cout << "TEST 1 : Simple task 1" << endl;
+        counter++;
+      };
+      auto f1_2 = [&]() {
+        cout << "TEST 1 : Simple task 2" << endl;
+        counter++;
+      };
+      auto f1_3 = [&]() {
+        cout << "TEST 1 : Simple task 3" << endl;
+        counter++;
+      };
+
+      StarterTaskNode<decltype(f1_1), ArgPack<>, ResPack<>> g1_1(move(f1_1), {});
+      TaskNode<decltype(f1_2), ArgPack<>, ResPack<>> g1_2(move(f1_2));
+      TaskNode<decltype(f1_3), ArgPack<>, ResPack<>> g1_3(move(f1_3));
+
+      PostTaskImpl(SimpleTHolder, move(g1_1))
+          .ThenImpl(move(g1_2))
+          .ThenImpl(move(g1_3));
+
+      //////////
+
+      auto f2_1 = [&](int i) -> int {
+        cout << "TEST 2 : Simple task 1" << endl;
+        counter++;
+        return 1;
+      };
+      auto f2_2 = [&](int i) -> int {
+        cout << "TEST 2 : Simple task 2" << endl;
+        counter++;
+        return 2;
+      };
+      auto f2_3 = [&](int i) -> int {
+        cout << "TEST 2 : Simple task 3" << endl;
+        counter++;
+        return 3;
+      };
+      auto f2_4 = [&](int i) -> void {
+        cout << "TEST 2 : Simple task 4" << endl;
+        counter++;
+      };
+
+      StarterTaskNode<decltype(f2_1), ArgPack<int>, ResPack<int>> g2_1(move(f2_1), {0});
+      TaskNode<decltype(f2_2), ArgPack<int>, ResPack<int>> g2_2(move(f2_2));
+      TaskNode<decltype(f2_3), ArgPack<int>, ResPack<int>> g2_3(move(f2_3));
+      TaskNode<decltype(f2_4), ArgPack<int>, ResPack<>> g2_4(move(f2_4));
+
+      PostTaskImpl(SimpleTHolder, move(g2_1))
+          .ThenImpl(move(g2_2))
+          .ThenImpl(move(g2_3))
+          .ThenImpl(move(g2_4));
+
+      ////
+
+      auto f3_1 = [&](int i, int j, int k) {
+        cout << "TEST 3 : Simple task 1" << endl;
+        counter++;
+        return make_tuple(1, 2, 3);
+      };
+      auto f3_2 = [&](int i, int j, int k) {
+        cout << "TEST 3 : Simple task 2" << endl;
+        counter++;
+        return make_tuple(1, 2, 3);
+      };
+      auto f3_3 = [&](int i, int j, int k) {
+        cout << "TEST 3 : Simple task 3" << endl;
+        counter++;
+        return make_tuple(1, 2, 3);
+      };
+      auto f3_4 = [&](int i, int j, int k) -> void {
+        cout << "TEST 3 : Simple task 4" << endl;
+        counter++;
+      };
+
+      StarterTaskNode<decltype(f3_1), ArgPack<int, int, int>, ResPack<int, int, int>> g3_1(move(f3_1), {1, 2, 3});
+      TaskNode<decltype(f3_2), ArgPack<int, int, int>, ResPack<int, int, int>> g3_2(move(f3_2));
+      TaskNode<decltype(f3_3), ArgPack<int, int, int>, ResPack<int, int, int>> g3_3(move(f3_3));
+      TaskNode<decltype(f3_4), ArgPack<int, int, int>, ResPack<>> g3_4(move(f3_4));
+
+      PostTaskImpl(SimpleTHolder, move(g3_1))
+          .ThenImpl(move(g3_2))
+          .ThenImpl(move(g3_3))
+          .ThenImpl(move(g3_4));
+
+    }
+  }
+
+  if (counter != 11) {
+    cout << "T FAIL" << endl;
+  } else {
+    cout << "T OK" << endl;
+  }
+
   cout << endl;
   cout << endl;
 
-  int counter = 0;
+  counter = 0;
 
   {
     TaskHolder SimpleTHolder;
@@ -127,6 +251,9 @@ int main() {
       }).Then([&]() {
         cout << "TEST 1 : Simple task 2" << endl;
         counter++;
+      }).Then([&]() {
+        cout << "TEST 1 : Simple task 3" << endl;
+        counter++;
       });
 
       PostTask(SimpleTHolder, [&]() -> int {
@@ -136,9 +263,13 @@ int main() {
       }).Then([&](int i) {
         cout << "TEST 2 : Task stage 2" << endl;
         counter++;
-      });
-            
-      PostTask(SimpleTHolder, [&](int i, int j, int k) {
+        return 1;
+          }); /*.Then([&](int i) {
+        cout << "TEST 2 : Task stage 3" << endl;
+        counter++;
+      });*/
+
+      /*PostTask(SimpleTHolder, [&](int i, int j, int k) {
         if (i != 1 || j != 2 || k != 3) {
           cout << "ERROR !\n";
         }
@@ -152,7 +283,7 @@ int main() {
         cout << "TEST 3 : Task stage 2" << endl;
         counter++;
         return 5;
-      });
+      });*/
       /*.Then([&](int i) {
         if (i != 5) {
           cout << "ERROR !\n";
