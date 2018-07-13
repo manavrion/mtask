@@ -11,206 +11,76 @@ namespace task {
 
 using std::move;
 
-// type of tasks node:
-// 1 - end node: result is void
-// 2 - node
-// 3 - start node to end node: contain args, result is void
-// 4 - start node to node: contain args, launch other node
+template <typename... Args>
+struct ArgPack {
+  using argument_tuple_t = std::tuple<Args...>;
+};
+
+template <typename... Res>
+struct ResPack {
+  using result_tuple_t = std::tuple<Res...>;
+};
 
 // Runnable interface for node
-template <class... Args>
-struct INode {
-  virtual void Run(Args...) = 0;
+template <typename Arg>
+struct ITaskNode {
+  using argument_tuple_t = Arg;
+  virtual void RunNode(argument_tuple_t) = 0;
 };
 
 // Runnable interface for task
-struct ITask {
+struct IRunnable {
   virtual void Run() = 0;
 };
 
-// node
+template <typename F, typename Arg, typename Res>
+struct TaskNode;
 
-template <class F, class Res, class... Args>
-struct TaskNode : INode<Args...> {
-  using functor_t = F;
-  using result_t = Res;
-  using argument_tuple_t = std::tuple<Args...>;
-
-  using child_argument_t = result_t;
-  using child_node_ptr_t = std::unique_ptr<INode<child_argument_t>>;
-
-  functor_t f;
-  child_node_ptr_t child_ptr;
-
-  TaskNode(functor_t f) : f(move(f)) {}
-  TaskNode(TaskNode&&) = default;
-
-  void Run(Args... args) final override {
-    auto res = f(move(args)...);
-    if (child_ptr) child_ptr->Run(move(res));
-  }
-};
-
-// end node
-template <class F, class... Args>
-struct TaskNode<F, void, Args...> : INode<Args...> {
-  using Res = void;
-
-  using functor_t = F;
-  using result_t = Res;
-  using argument_tuple_t = std::tuple<Args...>;
-
-  using child_argument_t = result_t;
-  using child_node_ptr_t = std::unique_ptr<INode<child_argument_t>>;
-
-  functor_t f;
-  child_node_ptr_t child_ptr;
-
-  TaskNode(functor_t f) : f(move(f)) {}
-  TaskNode(TaskNode&&) = default;
-
-  void Run(Args... args) final override {
-    f(move(args)...);
-    if (child_ptr) child_ptr->Run();
-  }
-};
-
-// starters
-
-// starter node
-template <class F, class Res, class... Args>
-struct Task : ITask {
-  using functor_t = F;
-  using result_t = Res;
-  using argument_tuple_t = std::tuple<Args...>;
-
-  using child_argument_t = result_t;
-  using child_node_ptr_t = std::unique_ptr<INode<child_argument_t>>;
-
-  functor_t f;
-  argument_tuple_t args;
-  child_node_ptr_t child_ptr;
-
-  Task(functor_t f, Args... args) : f(move(f)), args(move(args)...) {}
-  Task(Task&&) = default;
-
-  void Run() final override {
-    auto res = std::apply(move(f), move(args));
-    if (child_ptr) child_ptr->Run(move(res));
-  }
-};
-
-// simple starter
-template <class F, class... Args>
-struct Task<F, void, Args...> : ITask {
-  using Res = void;
-  using functor_t = F;
-  using result_t = Res;
-  using argument_tuple_t = std::tuple<Args...>;
-
-  using child_argument_t = result_t;
-  using child_node_ptr_t = std::unique_ptr<INode<child_argument_t>>;
-
-  functor_t f;
-  argument_tuple_t args;
-  child_node_ptr_t child_ptr;
-
-  Task(functor_t f, Args... args) : f(move(f)), args(move(args)...) {}
-  Task(Task&&) = default;
-
-  void Run() final override {
-    std::apply(move(f), move(args));
-    if (child_ptr) child_ptr->Run();
-  }
-};
-
-// builders
-
-class TaskHolder;
-
-// node
-template <class P, class C>
-class TaskBuilder {
-  using current_node_t = P;
-  using child_node_ptr_t = C;
-
-  using current_node_ptr_t = current_node_t*;
-  using root_node_ptr_t = std::unique_ptr<ITask>;
-
-  TaskHolder& th;
-  root_node_ptr_t root;
-  current_node_ptr_t current_ptr;
-
- public:
-  TaskBuilder(TaskHolder& th, root_node_ptr_t root,
-              current_node_ptr_t current_ptr)
-      : th(th), root(move(root)), current_ptr(current_ptr) {}
-  TaskBuilder(TaskBuilder&&) = default;
-
-  template <class G>
-  decltype(auto) Then(G g) {
-    using functor_lt = G;
-    using argument_lt = current_node_t::child_argument_t;
-    using result_lt = typename std::result_of<functor_lt(argument_lt)>::type;
-
-    using tasknode_lt = TaskNode<functor_lt, result_lt, argument_lt>;
-    auto tasknode_ptr = new tasknode_lt(move(g));
-    current_ptr->child_ptr.reset(tasknode_ptr);
-
-    return TaskBuilder<tasknode_lt, tasknode_lt::child_node_ptr_t>(
-        th, move(root), tasknode_ptr);
-  }
-
-  ~TaskBuilder() {
-    if (root) th.AddTask(move(root));
-  }
-};
-
-// end
-template <class P>
-class TaskBuilder<P, void> {
-  using current_node_t = P;
-  using child_node_ptr_t = void;
-
-  using current_node_ptr_t = current_node_t*;
-  using root_node_ptr_t = std::unique_ptr<ITask>;
-
-  TaskHolder& th;
-  root_node_ptr_t root;
-  current_node_ptr_t current_ptr;
-
- public:
-  TaskBuilder(TaskHolder& th, root_node_ptr_t root,
-              current_node_ptr_t current_ptr)
-      : th(th), root(move(root)), current_ptr(current_ptr) {}
-  TaskBuilder(TaskBuilder&&) = default;
-
-    template <class G>
-  decltype(auto) Then(G g) {
-    using functor_t = G;
-    using argument_t = current_node_t::child_argument_t;
-    using result_t = typename std::result_of<functor_t()>::type;
-
-    using node_t = TaskNode<functor_t, result_t>;
-    //auto node_ptr = new node_t(move(g));
-    //current_ptr->child_ptr.reset(node_ptr);
-    /*
-    return TaskBuilder<tasknode_lt, tasknode_lt::child_node_ptr_t>(
-        th, move(root), tasknode_ptr);*/
-  }
-
-  ~TaskBuilder() {
-    if (root) th.AddTask(move(root));
-  }
-};
-
-template <class F, class... Args>
-decltype(auto) PostTask(TaskHolder& th, F f, Args... args) {
-  using result_t = typename std::result_of<F(Args...)>::type;
-  using task_t = Task<F, result_t, Args...>;
-  auto task_ptr = new task_t(move(f), move(args)...);
-  return TaskBuilder<task_t, task_t::child_argument_t>(
-      th, std::unique_ptr<task_t>(task_ptr), task_ptr);
+template <typename F, typename Arg, typename Res>
+void FuncRunNode(TaskNode<F, Arg, Res>& node,
+                 typename Arg::argument_tuple_t& args) {
+  auto res = std::apply(move(node.f), move(args));
+  if (node.child_ptr) node.child_ptr->RunNode(move(res));
 }
+
+template <typename F, typename Arg>
+void FuncRunNode(TaskNode<F, Arg, ResPack<>>& node,
+                 typename Arg::argument_tuple_t& args) {
+  std::apply(move(node.f), move(args));
+  if (node.child_ptr) node.child_ptr->RunNode({});
+}
+
+template <typename F, typename Arg, typename Res>
+struct TaskNode : ITaskNode<typename Arg::argument_tuple_t> {
+  using functor_t = F;
+  using argument_tuple_t = typename Arg::argument_tuple_t;
+  using result_tuple_t = typename Res::result_tuple_t;
+
+  using child_argument_tuple_t = result_tuple_t;
+  using child_node_ptr_t = std::unique_ptr<ITaskNode<child_argument_tuple_t>>;
+
+  functor_t f;
+  child_node_ptr_t child_ptr;
+
+  TaskNode(functor_t f) : f(move(f)) {}
+  TaskNode(TaskNode&&) = default;
+
+  void RunNode(argument_tuple_t args) final override {
+    FuncRunNode(*this, args);
+  }
+};
+
+template <typename F, typename Arg, typename Res>
+struct StarterTaskNode : IRunnable, TaskNode<F, Arg, Res> {
+  argument_tuple_t args;
+
+  StarterTaskNode(functor_t f, argument_tuple_t args)
+      : TaskNode(move(f)), args(move(args)) {}
+  StarterTaskNode(StarterTaskNode&&) = default;
+
+  void Run() final override { RunNode(move(args)); };
+};
+
+
 
 }  // namespace task

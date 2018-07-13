@@ -18,7 +18,7 @@ namespace task {
 struct AddTaskAfterClose : std::exception {};
 
 class TaskHolder {
-  using task_ptr_t = std::unique_ptr<ITask>;
+  using task_ptr_t = std::unique_ptr<IRunnable>;
   using task_queue_t = std::vector<task_ptr_t>;
   using mutex_t = std::mutex;
   using auto_lock_t = std::lock_guard<mutex_t>;
