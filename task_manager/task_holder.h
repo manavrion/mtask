@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -13,6 +14,8 @@
 // TODO: Reference additional headers your program requires here.
 
 namespace task {
+
+struct AddTaskAfterClose : std::exception {};
 
 class TaskHolder {
   using task_ptr_t = std::unique_ptr<ITask>;
@@ -25,7 +28,7 @@ class TaskHolder {
   task_queue_t IncomingQueue;
   mutex_t IncomingQueueMutex;
 
-  bool IsClosure;
+  std::atomic<bool> IsClosure;
   exception_ptr_t ExceptionPtr;
   thread_t Thread;
 
@@ -45,12 +48,13 @@ class TaskHolder {
         }
       }
 
-      if (IsClosure) break;
-
       bool sleep = false;
       {
         auto_lock_t al(IncomingQueueMutex);
-        if (IncomingQueue.empty()) sleep = true;
+        if (IncomingQueue.empty()) {
+          if (IsClosure) break;
+          sleep = true;
+        }
       }
       if (sleep) std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
@@ -60,6 +64,7 @@ class TaskHolder {
   TaskHolder() : IsClosure(false), Thread(std::bind(&TaskHolder::Loop, this)) {}
 
   void AddTask(task_ptr_t task) {
+    if (IsClosure) throw AddTaskAfterClose{};
     auto_lock_t al(IncomingQueueMutex);
     IncomingQueue.push_back(std::move(task));
   }

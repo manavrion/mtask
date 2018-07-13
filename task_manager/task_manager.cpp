@@ -18,9 +18,13 @@ int main() {
     TaskHolder SimpleTHolder;
     {
       PostTask(SimpleTHolder, [&]() { 
-        cout << "TEST 1 : Simple task" << endl;
+        cout << "TEST 1 : Simple task 1" << endl;
         counter++;
-      });
+      }).Then([]() {});
+      /*.Then([&]() {
+        cout << "TEST 1 : Simple task 2" << endl;
+        counter++;
+      });*/
       
       PostTask(SimpleTHolder, [&]() -> int {
         cout << "TEST 2 : Task stage 1" << endl;
@@ -56,7 +60,7 @@ int main() {
   }
 
   cout << counter << endl;
-  if (counter != 6) {
+  if (counter != 7) {
     cout << "FAIL" << endl;
   } else {
     cout << "OK" << endl;
