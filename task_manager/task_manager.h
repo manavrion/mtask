@@ -16,9 +16,35 @@ struct ArgPack {
   using argument_tuple_t = std::tuple<Args...>;
 };
 
+template <typename... Args>
+struct ArgPack<std::tuple<Args...>> {
+  using argument_tuple_t = std::tuple<Args...>;
+};
+
 template <typename... Res>
 struct ResPack {
   using result_tuple_t = std::tuple<Res...>;
+};
+
+template <typename Res>
+struct DeduceResPack {
+  using value = ResPack<Res>;
+};
+
+template <>
+struct DeduceResPack<void> {
+  using value = ResPack<>;
+};
+
+template <typename F, typename Args>
+struct DeduceResPack2 {
+  using value = ResPack<>;
+};
+
+template <typename F, typename ... Args>
+struct DeduceResPack2<F, std::tuple<Args ...>> {
+  using value =
+      typename DeduceResPack<typename std::result_of<F(Args...)>::type>::value;
 };
 
 // Runnable interface for node
@@ -81,6 +107,62 @@ struct StarterTaskNode : IRunnable, TaskNode<F, Arg, Res> {
   void Run() final override { RunNode(move(args)); };
 };
 
+// Task builders
 
+class TaskHolder;
+
+// node
+template <class P, class C>
+class TaskBuilder {
+  using current_node_t = P;
+  using child_node_ptr_t = C;
+
+  using current_node_ptr_t = current_node_t*;
+  using root_node_ptr_t = std::unique_ptr<IRunnable>;
+
+  TaskHolder& holder;
+  root_node_ptr_t root;
+  current_node_ptr_t current_ptr;
+
+ public:
+  TaskBuilder(TaskHolder& holder, root_node_ptr_t root,
+              current_node_ptr_t current_ptr)
+      : holder(holder), root(move(root)), current_ptr(current_ptr) {}
+  TaskBuilder(TaskBuilder&&) = default;
+
+  template <class G>
+  decltype(auto) Then(G g) {
+
+    using functor_t = G;
+    using argument_tuple_t = ArgPack<current_node_t::child_argument_tuple_t>;
+    using result_tuple_t = typename DeduceResPack2<G, argument_tuple_t>::value;
+
+    using node_t = TaskNode<functor_t, argument_tuple_t, result_tuple_t>;
+    auto node_ptr = new node_t(move(g));
+
+    current_ptr->child_ptr.reset(node_ptr);
+
+    return TaskBuilder<node_t, node_t::child_argument_tuple_t>(
+        holder, move(root), node_ptr);
+  }
+
+  ~TaskBuilder() {
+    if (root) holder.AddTask(move(root));
+  }
+};
+
+template <class F, class... Args>
+decltype(auto) PostTask(TaskHolder& th, F f, Args... args) {
+
+  using functor_t = F;
+  using argument_tuple_t = ArgPack<Args...>;
+  using result_tuple_t = typename DeduceResPack<typename std::result_of<F(Args...)>::type>::value;
+
+  using node_t = StarterTaskNode<functor_t, argument_tuple_t, result_tuple_t>;
+  auto node_ptr = new node_t(move(f), {move(args)...});
+
+  return TaskBuilder<node_t, node_t::child_argument_tuple_t>(
+      th, std::unique_ptr<node_t>(node_ptr), node_ptr);
+}
 
 }  // namespace task

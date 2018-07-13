@@ -113,21 +113,23 @@ int main() {
     tn1.Run();
   }
 
+  cout << endl;
+  cout << endl;
+
   int counter = 0;
 
   {
     TaskHolder SimpleTHolder;
     {
-      /*PostTask(SimpleTHolder, [&]() {
+      PostTask(SimpleTHolder, [&]() {
         cout << "TEST 1 : Simple task 1" << endl;
         counter++;
-      }).Then([]() {});*/
-      /*.Then([&]() {
+      }).Then([&]() {
         cout << "TEST 1 : Simple task 2" << endl;
         counter++;
-      });*/
+      });
 
-      /*PostTask(SimpleTHolder, [&]() -> int {
+      PostTask(SimpleTHolder, [&]() -> int {
         cout << "TEST 2 : Task stage 1" << endl;
         counter++;
         return 0;
@@ -135,7 +137,7 @@ int main() {
         cout << "TEST 2 : Task stage 2" << endl;
         counter++;
       });
-      
+            
       PostTask(SimpleTHolder, [&](int i, int j, int k) {
         if (i != 1 || j != 2 || k != 3) {
           cout << "ERROR !\n";
@@ -150,7 +152,8 @@ int main() {
         cout << "TEST 3 : Task stage 2" << endl;
         counter++;
         return 5;
-      }).Then([&](int i) {
+      });
+      /*.Then([&](int i) {
         if (i != 5) {
           cout << "ERROR !\n";
         }
