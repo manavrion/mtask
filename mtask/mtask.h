@@ -190,7 +190,7 @@ class TaskHolder {
   task_queue_t IncomingQueue;
   std::mutex IncomingQueueMutex;
 
-  std::atomic<bool> IsClosure;
+  std::atomic<bool> IsDestructing;
   std::exception_ptr ExceptionPtr;
   std::thread Thread;
 
@@ -214,7 +214,7 @@ class TaskHolder {
       {
         auto_lock_t al(IncomingQueueMutex);
         if (IncomingQueue.empty()) {
-          if (IsClosure) break;
+          if (IsDestructing) break;
           sleep = true;
         }
       }
@@ -224,10 +224,11 @@ class TaskHolder {
   }
 
  public:
-  TaskHolder() : IsClosure(false), Thread(std::bind(&TaskHolder::Loop, this)) {}
+  TaskHolder()
+      : IsDestructing(false), Thread(std::bind(&TaskHolder::Loop, this)) {}
 
   void AddTask(task_ptr_t task) {
-    if (IsClosure) throw AddTaskAfterClose{};
+    if (IsDestructing) throw AddTaskAfterClose{};
     auto_lock_t al(IncomingQueueMutex);
     IncomingQueue.push_back(std::move(task));
   }
@@ -235,7 +236,7 @@ class TaskHolder {
   std::exception_ptr& GetException() { return ExceptionPtr; }
 
   ~TaskHolder() {
-    IsClosure = true;
+    IsDestructing = true;
     Thread.join();
   }
 };
