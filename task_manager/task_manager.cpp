@@ -10,28 +10,29 @@ using namespace std;
 using namespace task;
 
 int main() {
+  cout << "Run tests" << endl;
   // only TaskNode tests
   {
     auto f1 = [](int i, int j) {
       cout << "pre test 1/4" << endl;
       return make_tuple(i + 1, j + 1);
     };
-    TaskNode<decltype(f1), ArgPack<int, int>, ResPack<int, int>> tn1(move(f1));
+    TaskNode<decltype(f1), Pack<int, int>, Pack<int, int>> tn1(move(f1));
     tn1.RunNode({1, 2});
 
     auto f2 = []() { cout << "pre test 2/4" << endl; };
-    TaskNode<decltype(f2), ArgPack<>, ResPack<>> tn2(move(f2));
+    TaskNode<decltype(f2), Pack<>, Pack<>> tn2(move(f2));
     tn2.RunNode({});
 
     auto f3 = [](int i) { cout << "pre test 3/4" << endl; };
-    TaskNode<decltype(f3), ArgPack<int>, ResPack<>> tn3(move(f3));
+    TaskNode<decltype(f3), Pack<int>, Pack<>> tn3(move(f3));
     tn3.RunNode({1});
 
     auto f4 = []() {
       cout << "pre test 4/4" << endl;
       return make_tuple(1);
     };
-    TaskNode<decltype(f4), ArgPack<>, ResPack<int>> tn4(move(f4));
+    TaskNode<decltype(f4), Pack<>, Pack<int>> tn4(move(f4));
     tn4.RunNode({});
   }
 
@@ -46,9 +47,9 @@ int main() {
     };
     auto f3 = [](int i, int j) { cout << "pre II test 2/4" << endl; };
 
-    TaskNode<decltype(f1), ArgPack<>, ResPack<int, int>> tn1(move(f1));
+    TaskNode<decltype(f1), Pack<>, Pack<int, int>> tn1(move(f1));
     tn1.child_ptr.reset(
-        new TaskNode<decltype(f2), ArgPack<int, int>, ResPack<>>(move(f2)));
+        new TaskNode<decltype(f2), Pack<int, int>, Pack<>>(move(f2)));
     tn1.RunNode({});
   }
 
@@ -60,9 +61,9 @@ int main() {
       return Bar{};
     };
     auto f2 = [](Bar i) { cout << "pre II test 4/4" << endl; };
-    TaskNode<decltype(f1), ArgPack<>, ResPack<Bar>> tn1(move(f1));
+    TaskNode<decltype(f1), Pack<>, Pack<Bar>> tn1(move(f1));
     tn1.child_ptr.reset(
-        new TaskNode<decltype(f2), ArgPack<Bar>, ResPack<>>(move(f2)));
+        new TaskNode<decltype(f2), Pack<Bar>, Pack<>>(move(f2)));
     tn1.RunNode({});
   }
 
@@ -72,23 +73,23 @@ int main() {
       cout << "pre III test 1/8" << endl;
       return make_tuple(i + 1, j + 1);
     };
-    StarterTaskNode<decltype(f1), ArgPack<int, int>, ResPack<int, int>> tn1(
+    StarterTaskNode<decltype(f1), Pack<int, int>, Pack<int, int>> tn1(
         move(f1), {1, 2});
     tn1.Run();
 
     auto f2 = []() { cout << "pre III test 2/8" << endl; };
-    StarterTaskNode<decltype(f2), ArgPack<>, ResPack<>> tn2(move(f2), {});
+    StarterTaskNode<decltype(f2), Pack<>, Pack<>> tn2(move(f2), {});
     tn2.Run();
 
     auto f3 = [](int i) { cout << "pre III test 3/8" << endl; };
-    StarterTaskNode<decltype(f3), ArgPack<int>, ResPack<>> tn3(move(f3), {1});
+    StarterTaskNode<decltype(f3), Pack<int>, Pack<>> tn3(move(f3), {1});
     tn3.Run();
 
     auto f4 = []() {
       cout << "pre III test 4/8" << endl;
       return make_tuple(1);
     };
-    StarterTaskNode<decltype(f4), ArgPack<>, ResPack<int>> tn4(move(f4), {});
+    StarterTaskNode<decltype(f4), Pack<>, Pack<int>> tn4(move(f4), {});
     tn4.Run();
   }
 
@@ -107,15 +108,15 @@ int main() {
     };
     auto f4 = [](int i, int j) { cout << "pre III test 6/8   3" << endl; };
 
-    StarterTaskNode<decltype(f1), ArgPack<>, ResPack<int, int>> tn1(move(f1),
+    StarterTaskNode<decltype(f1), Pack<>, Pack<int, int>> tn1(move(f1),
                                                                     {});
 
-    auto p2 = new TaskNode<decltype(f2), ArgPack<int, int>, ResPack<int, int>>(
+    auto p2 = new TaskNode<decltype(f2), Pack<int, int>, Pack<int, int>>(
         move(f2));
-    auto p3 = new TaskNode<decltype(f3), ArgPack<int, int>, ResPack<int, int>>(
+    auto p3 = new TaskNode<decltype(f3), Pack<int, int>, Pack<int, int>>(
         move(f3));
     auto p4 =
-        new TaskNode<decltype(f4), ArgPack<int, int>, ResPack<>>(move(f4));
+        new TaskNode<decltype(f4), Pack<int, int>, Pack<>>(move(f4));
 
     p2->child_ptr.reset(p3);
     p3->child_ptr.reset(p4);
@@ -134,9 +135,9 @@ int main() {
     };
     auto f2 = [](Bar i) { cout << "pre III test 8/8" << endl; };
 
-    StarterTaskNode<decltype(f1), ArgPack<>, ResPack<Bar>> tn1(move(f1), {});
+    StarterTaskNode<decltype(f1), Pack<>, Pack<Bar>> tn1(move(f1), {});
     tn1.child_ptr.reset(
-        new TaskNode<decltype(f2), ArgPack<Bar>, ResPack<>>(move(f2)));
+        new TaskNode<decltype(f2), Pack<Bar>, Pack<>>(move(f2)));
     tn1.Run();
   }
 
@@ -157,9 +158,9 @@ int main() {
         counter++;
       };
 
-      StarterTaskNode<decltype(f1_1), ArgPack<>, ResPack<>> g1_1(move(f1_1), {});
-      TaskNode<decltype(f1_2), ArgPack<>, ResPack<>> g1_2(move(f1_2));
-      TaskNode<decltype(f1_3), ArgPack<>, ResPack<>> g1_3(move(f1_3));
+      StarterTaskNode<decltype(f1_1), Pack<>, Pack<>> g1_1(move(f1_1), {});
+      TaskNode<decltype(f1_2), Pack<>, Pack<>> g1_2(move(f1_2));
+      TaskNode<decltype(f1_3), Pack<>, Pack<>> g1_3(move(f1_3));
 
       PostTaskImpl(SimpleTHolder, move(g1_1))
           .ThenImpl(move(g1_2))
@@ -189,10 +190,10 @@ int main() {
         counter++;
       };
 
-      StarterTaskNode<decltype(f2_1), ArgPack<int>, ResPack<int>> g2_1(move(f2_1), {0});
-      TaskNode<decltype(f2_2), ArgPack<int>, ResPack<int>> g2_2(move(f2_2));
-      TaskNode<decltype(f2_3), ArgPack<int>, ResPack<int>> g2_3(move(f2_3));
-      TaskNode<decltype(f2_4), ArgPack<int>, ResPack<>> g2_4(move(f2_4));
+      StarterTaskNode<decltype(f2_1), Pack<int>, Pack<int>> g2_1(move(f2_1), {0});
+      TaskNode<decltype(f2_2), Pack<int>, Pack<int>> g2_2(move(f2_2));
+      TaskNode<decltype(f2_3), Pack<int>, Pack<int>> g2_3(move(f2_3));
+      TaskNode<decltype(f2_4), Pack<int>, Pack<>> g2_4(move(f2_4));
 
       PostTaskImpl(SimpleTHolder, move(g2_1))
           .ThenImpl(move(g2_2))
@@ -223,10 +224,10 @@ int main() {
         counter++;
       };
 
-      StarterTaskNode<decltype(f3_1), ArgPack<int, int, int>, ResPack<int, int, int>> g3_1(f3_1, {1, 2, 3});
-      TaskNode<decltype(f3_2), ArgPack<int, int, int>, ResPack<int, int, int>> g3_2(f3_2);
-      TaskNode<decltype(f3_3), ArgPack<int, int, int>, ResPack<int, int, int>> g3_3(f3_3);
-      TaskNode<decltype(f3_4), ArgPack<int, int, int>, ResPack<>> g3_4(f3_4);
+      StarterTaskNode<decltype(f3_1), Pack<int, int, int>, Pack<int, int, int>> g3_1(f3_1, {1, 2, 3});
+      TaskNode<decltype(f3_2), Pack<int, int, int>, Pack<int, int, int>> g3_2(f3_2);
+      TaskNode<decltype(f3_3), Pack<int, int, int>, Pack<int, int, int>> g3_3(f3_3);
+      TaskNode<decltype(f3_4), Pack<int, int, int>, Pack<>> g3_4(f3_4);
 
       PostTaskImpl(SimpleTHolder, move(g3_1))
           .ThenImpl(move(g3_2))
@@ -331,6 +332,8 @@ int main() {
     cout << "OK" << endl;
   }
 
+
+  cout << "Done!" << endl;
   getchar();
   return 0;
 }
