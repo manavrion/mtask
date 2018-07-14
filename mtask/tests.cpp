@@ -1,12 +1,12 @@
 ﻿//
 // Copyright (C) 2018 Ruslan Manaev (manavrion@yandex.com)
-// task_manager tests
+// mtask tests
 //
 
 #include <iostream>
-#include "task_manager.h"
+#include "mtask.h"
 
-using namespace manavrion::task_manager;
+using namespace manavrion::mtask;
 using namespace std;
 
 int main() {

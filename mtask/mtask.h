@@ -1,6 +1,6 @@
 ﻿//
 // Copyright (C) 2018 Ruslan Manaev (manavrion@yandex.com)
-// task_manager version 0.7
+// mtask version 0.7
 // This file is a single-file library and implements simple concurrency
 //
 
@@ -13,7 +13,7 @@
 #include <vector>
 
 namespace manavrion {
-namespace task_manager {
+namespace mtask {
 
 using std::move;
 
@@ -241,5 +241,5 @@ class TaskHolder {
   }
 };
 
-}  // namespace task_manager
+}  // namespace mtask
 }  // namespace manavrion

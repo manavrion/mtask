@@ -3,7 +3,7 @@
 #
 cmake_minimum_required (VERSION 3.8)
 
-project ("task_manager")
+project ("mtask")
 
 # Include sub-projects.
-add_subdirectory ("task_manager")
+add_subdirectory ("mtask")
