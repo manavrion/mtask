@@ -1,6 +1,6 @@
 ﻿//
 // Copyright (C) 2018 Ruslan Manaev (manavrion@yandex.com)
-// mtask version 0.7
+// mtask version 0.8
 // This file is a single-file library and implements simple concurrency
 //
 
@@ -23,35 +23,36 @@ struct Pack {
 };
 
 // Deduce Pack from result of function or tuple
-// using: typename DeducePack<typename std::result_of<F(As...)>::type>::value
+// using: 
+// typename DeducePack<decltype(std::declval<F>()(std::declval<As>()...))>::type 
 // where: F - function, As... - arguments
 
 template <typename R>
 struct DeducePack {
-  using value = Pack<R>;
+  using type = Pack<R>;
 };
 
 template <typename... Rs>
 struct DeducePack<std::tuple<Rs...>> {
-  using value = Pack<Rs...>;
+  using type = Pack<Rs...>;
 };
 
 template <>
 struct DeducePack<void> {
-  using value = Pack<>;
+  using type = Pack<>;
 };
 
 // Deduce ResPack from function and arguments
-// using: typename DeduceResPack<functor_t, argument_t>::value;
+// using: typename DeduceResPack<functor_t, argument_t>::type;
 // where: functor_t - function, argument_t - arguments as Pack<As...>
 
 template <typename F, typename A>
-struct DeduceResPack {};
+struct DeduceResPack;
 
 template <typename F, typename... As>
 struct DeduceResPack<F, Pack<As...>> {
-  using value =
-      typename DeducePack<typename std::result_of<F(As...)>::type>::value;
+  using type = typename DeducePack<decltype(
+      std::declval<F>()(std::declval<As>()...))>::type;
 };
 
 // Runnable interface for node
@@ -138,7 +139,7 @@ class TaskBuilder {
   TaskBuilder(TaskBuilder&&) = default;
 
   template <typename... As, typename... Rs, typename F>
-  decltype(auto) ThenImpl(TaskNode<F, Pack<As...>, Pack<Rs...>> node) {
+  auto ThenImpl(TaskNode<F, Pack<As...>, Pack<Rs...>> node) {
     using child_node_t = TaskNode<F, Pack<As...>, Pack<Rs...>>;
     auto node_rawptr = new child_node_t(move(node));
     current_ptr->child_ptr.reset(node_rawptr);
@@ -146,10 +147,10 @@ class TaskBuilder {
   }
 
   template <class G>
-  decltype(auto) Then(G g) {
+  auto Then(G g) {
     using functor_t = G;
     using argument_t = current_node_t::result_pack_t;
-    using result_t = typename DeduceResPack<functor_t, argument_t>::value;
+    using result_t = typename DeduceResPack<functor_t, argument_t>::type;
     using node_t = TaskNode<functor_t, argument_t, result_t>;
     return ThenImpl(node_t(move(g)));
   }
@@ -160,7 +161,7 @@ class TaskBuilder {
 };
 
 template <typename... As, typename... Rs, typename F>
-decltype(auto) PostTaskImpl(TaskHolder& holder,
+auto PostTaskImpl(TaskHolder& holder,
                             StarterTaskNode<F, Pack<As...>, Pack<Rs...>> node) {
   using node_t = StarterTaskNode<F, Pack<As...>, Pack<Rs...>>;
   auto node_rawptr = new node_t(move(node));
@@ -169,10 +170,10 @@ decltype(auto) PostTaskImpl(TaskHolder& holder,
 }
 
 template <class F, class... Args>
-decltype(auto) PostTask(TaskHolder& holder, F f, Args... args) {
+auto PostTask(TaskHolder& holder, F f, Args... args) {
   using functor_t = F;
   using argument_t = Pack<Args...>;
-  using result_t = typename DeduceResPack<functor_t, argument_t>::value;
+  using result_t = typename DeduceResPack<functor_t, argument_t>::type;
   using node_t = StarterTaskNode<functor_t, argument_t, result_t>;
   return PostTaskImpl(holder, node_t(move(f), {move(args)...}));
 }
@@ -184,17 +185,14 @@ struct AddTaskAfterClose : std::exception {};
 class TaskHolder {
   using task_ptr_t = std::unique_ptr<IRunnable>;
   using task_queue_t = std::vector<task_ptr_t>;
-  using mutex_t = std::mutex;
-  using auto_lock_t = std::lock_guard<mutex_t>;
-  using thread_t = std::thread;
-  using exception_ptr_t = std::exception_ptr;
+  using auto_lock_t = std::lock_guard<std::mutex>;
 
   task_queue_t IncomingQueue;
-  mutex_t IncomingQueueMutex;
+  std::mutex IncomingQueueMutex;
 
   std::atomic<bool> IsClosure;
-  exception_ptr_t ExceptionPtr;
-  thread_t Thread;
+  std::exception_ptr ExceptionPtr;
+  std::thread Thread;
 
   void Loop() {
     while (true) {
@@ -220,6 +218,7 @@ class TaskHolder {
           sleep = true;
         }
       }
+      // bad code
       if (sleep) std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
   }
@@ -233,7 +232,7 @@ class TaskHolder {
     IncomingQueue.push_back(std::move(task));
   }
 
-  exception_ptr_t& GetException() { return ExceptionPtr; }
+  std::exception_ptr& GetException() { return ExceptionPtr; }
 
   ~TaskHolder() {
     IsClosure = true;
