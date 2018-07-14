@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <typeinfo>
 #include "task_holder.h"
 
 using namespace std;
@@ -164,6 +165,8 @@ int main() {
           .ThenImpl(move(g1_2))
           .ThenImpl(move(g1_3));
 
+      PostTask(SimpleTHolder, f1_1).Then(f1_2).Then(f1_3);
+
       //////////
 
       auto f2_1 = [&](int i) -> int {
@@ -196,6 +199,8 @@ int main() {
           .ThenImpl(move(g2_3))
           .ThenImpl(move(g2_4));
 
+      PostTask(SimpleTHolder, f2_1, 1).Then(f2_2).Then(f2_3).Then(f2_4);
+
       ////
 
       auto f3_1 = [&](int i, int j, int k) {
@@ -218,20 +223,22 @@ int main() {
         counter++;
       };
 
-      StarterTaskNode<decltype(f3_1), ArgPack<int, int, int>, ResPack<int, int, int>> g3_1(move(f3_1), {1, 2, 3});
-      TaskNode<decltype(f3_2), ArgPack<int, int, int>, ResPack<int, int, int>> g3_2(move(f3_2));
-      TaskNode<decltype(f3_3), ArgPack<int, int, int>, ResPack<int, int, int>> g3_3(move(f3_3));
-      TaskNode<decltype(f3_4), ArgPack<int, int, int>, ResPack<>> g3_4(move(f3_4));
+      StarterTaskNode<decltype(f3_1), ArgPack<int, int, int>, ResPack<int, int, int>> g3_1(f3_1, {1, 2, 3});
+      TaskNode<decltype(f3_2), ArgPack<int, int, int>, ResPack<int, int, int>> g3_2(f3_2);
+      TaskNode<decltype(f3_3), ArgPack<int, int, int>, ResPack<int, int, int>> g3_3(f3_3);
+      TaskNode<decltype(f3_4), ArgPack<int, int, int>, ResPack<>> g3_4(f3_4);
 
       PostTaskImpl(SimpleTHolder, move(g3_1))
           .ThenImpl(move(g3_2))
           .ThenImpl(move(g3_3))
           .ThenImpl(move(g3_4));
 
+      PostTask(SimpleTHolder, f3_1, 1, 2, 3).Then(f3_2).Then(f3_3).Then(f3_4);
+
     }
   }
 
-  if (counter != 11) {
+  if (counter != 11*2) {
     cout << "T FAIL" << endl;
   } else {
     cout << "T OK" << endl;
@@ -264,12 +271,12 @@ int main() {
         cout << "TEST 2 : Task stage 2" << endl;
         counter++;
         return 1;
-          }); /*.Then([&](int i) {
+      }).Then([&](int i) {
         cout << "TEST 2 : Task stage 3" << endl;
         counter++;
-      });*/
+      });
 
-      /*PostTask(SimpleTHolder, [&](int i, int j, int k) {
+      PostTask(SimpleTHolder, [&](int i, int j, int k) {
         if (i != 1 || j != 2 || k != 3) {
           cout << "ERROR !\n";
         }
@@ -283,19 +290,18 @@ int main() {
         cout << "TEST 3 : Task stage 2" << endl;
         counter++;
         return 5;
-      });*/
-      /*.Then([&](int i) {
+      }).Then([&](int i) {
         if (i != 5) {
           cout << "ERROR !\n";
         }
         cout << "TEST 3 : Task stage 3" << endl;
         counter++;
-      });*/
+      });
     }
   }
 
   cout << counter << endl;
-  if (counter != 7) {
+  if (counter != 9) {
     cout << "FAIL" << endl;
   } else {
     cout << "OK" << endl;
