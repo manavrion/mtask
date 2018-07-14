@@ -2,12 +2,8 @@
 // or project specific include files.
 
 #pragma once
-
-#include <iostream>
 #include <memory>
 #include <tuple>
-#include <string>
-#include <typeinfo>  //tmp
 
 namespace task {
 
@@ -74,11 +70,6 @@ struct DeduceResPackFromArgPack {};
 
 template <typename F, typename ... As>
 struct DeduceResPackFromArgPack<F, ArgPack<As...>> {
-  using value = typename DeduceResPack<typename std::result_of<F(As...)>::type>::value;
-};
-
-template <typename F, typename... As>
-struct DeduceResPackFromArgPack<F, ArgPack<std::tuple<As...>>> {
   using value = typename DeduceResPack<typename std::result_of<F(As...)>::type>::value;
 };
 

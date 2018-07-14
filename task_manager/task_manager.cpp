@@ -297,11 +297,35 @@ int main() {
         cout << "TEST 3 : Task stage 3" << endl;
         counter++;
       });
+
+      PostTask(SimpleTHolder, [&](int i, int j, int k) {
+        if (i != 1 || j != 2 || k != 3) cout << "ERROR !\n";        
+        cout << "TEST 4 : Task stage 1" << endl;
+        counter++;
+        return make_tuple(i + 1, j + 1, k + 1);
+      }, 1, 2, 3).Then([&](int i, int j, int k) {
+        if (i != 2 || j != 3 || k != 4) cout << "ERROR !\n";       
+        cout << "TEST 4 : Task stage 2" << endl;
+        counter++;
+        return make_pair(1, 2);
+      }).Then([&](std::pair<int, int> pair) {
+        cout << "TEST 4 : Task stage 3" << endl;
+        counter++;
+        return make_tuple(1);
+      }).Then([&](int i) {
+        cout << "TEST 4 : Task stage 4" << endl;
+        counter++;
+        return 1;
+      }).Then([&](int i) {
+        cout << "TEST 4 : Task stage 5" << endl;
+        counter++;
+        return 1;
+      });
     }
   }
 
   cout << counter << endl;
-  if (counter != 9) {
+  if (counter != 14) {
     cout << "FAIL" << endl;
   } else {
     cout << "OK" << endl;
