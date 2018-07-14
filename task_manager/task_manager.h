@@ -1,11 +1,19 @@
-﻿// task_manager.h : Include file for standard system include files,
-// or project specific include files.
+﻿//
+// Copyright (C) 2018 Ruslan Manaev (manavrion@yandex.com)
+// task_manager version 0.7
+// This file is a single-file library and implements simple concurrency
+//
 
 #pragma once
+#include <atomic>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
 #include <tuple>
+#include <vector>
 
-namespace task {
+namespace manavrion {
+namespace task_manager {
 
 using std::move;
 
@@ -23,7 +31,7 @@ struct DeducePack {
   using value = Pack<R>;
 };
 
-template <typename ... Rs>
+template <typename... Rs>
 struct DeducePack<std::tuple<Rs...>> {
   using value = Pack<Rs...>;
 };
@@ -40,13 +48,11 @@ struct DeducePack<void> {
 template <typename F, typename A>
 struct DeduceResPack {};
 
-template <typename F, typename ... As>
+template <typename F, typename... As>
 struct DeduceResPack<F, Pack<As...>> {
-  using value = typename DeducePack<typename std::result_of<F(As...)>::type>::value;
+  using value =
+      typename DeducePack<typename std::result_of<F(As...)>::type>::value;
 };
-
-//
-
 
 // Runnable interface for node
 template <typename Arg>
@@ -64,15 +70,13 @@ template <typename F, typename Arg, typename Res>
 struct TaskNode;
 
 template <typename F, typename Arg, typename Res>
-void FuncRunNode(TaskNode<F, Arg, Res>& node,
-                 typename Arg::tuple_t& args) {
+void FuncRunNode(TaskNode<F, Arg, Res>& node, typename Arg::tuple_t& args) {
   auto res = std::apply(move(node.f), move(args));
   if (node.child_ptr) node.child_ptr->RunNode(move(res));
 }
 
 template <typename F, typename Arg>
-void FuncRunNode(TaskNode<F, Arg, Pack<>>& node,
-                 typename Arg::tuple_t& args) {
+void FuncRunNode(TaskNode<F, Arg, Pack<>>& node, typename Arg::tuple_t& args) {
   std::apply(move(node.f), move(args));
   if (node.child_ptr) node.child_ptr->RunNode({});
 }
@@ -156,9 +160,8 @@ class TaskBuilder {
 };
 
 template <typename... As, typename... Rs, typename F>
-decltype(auto) PostTaskImpl(
-    TaskHolder& holder,
-    StarterTaskNode<F, Pack<As...>, Pack<Rs...>> node) {
+decltype(auto) PostTaskImpl(TaskHolder& holder,
+                            StarterTaskNode<F, Pack<As...>, Pack<Rs...>> node) {
   using node_t = StarterTaskNode<F, Pack<As...>, Pack<Rs...>>;
   auto node_rawptr = new node_t(move(node));
   return TaskBuilder<node_t>(holder, std::unique_ptr<node_t>(node_rawptr),
@@ -174,4 +177,69 @@ decltype(auto) PostTask(TaskHolder& holder, F f, Args... args) {
   return PostTaskImpl(holder, node_t(move(f), {move(args)...}));
 }
 
-}  // namespace task
+// Task holder
+
+struct AddTaskAfterClose : std::exception {};
+
+class TaskHolder {
+  using task_ptr_t = std::unique_ptr<IRunnable>;
+  using task_queue_t = std::vector<task_ptr_t>;
+  using mutex_t = std::mutex;
+  using auto_lock_t = std::lock_guard<mutex_t>;
+  using thread_t = std::thread;
+  using exception_ptr_t = std::exception_ptr;
+
+  task_queue_t IncomingQueue;
+  mutex_t IncomingQueueMutex;
+
+  std::atomic<bool> IsClosure;
+  exception_ptr_t ExceptionPtr;
+  thread_t Thread;
+
+  void Loop() {
+    while (true) {
+      task_queue_t ProcessingQueue;
+      {
+        auto_lock_t al(IncomingQueueMutex);
+        std::swap(ProcessingQueue, IncomingQueue);
+      }
+
+      for (auto& task : ProcessingQueue) {
+        try {
+          task->Run();
+        } catch (...) {
+          ExceptionPtr = std::current_exception();
+        }
+      }
+
+      bool sleep = false;
+      {
+        auto_lock_t al(IncomingQueueMutex);
+        if (IncomingQueue.empty()) {
+          if (IsClosure) break;
+          sleep = true;
+        }
+      }
+      if (sleep) std::this_thread::sleep_for(std::chrono::microseconds(1));
+    }
+  }
+
+ public:
+  TaskHolder() : IsClosure(false), Thread(std::bind(&TaskHolder::Loop, this)) {}
+
+  void AddTask(task_ptr_t task) {
+    if (IsClosure) throw AddTaskAfterClose{};
+    auto_lock_t al(IncomingQueueMutex);
+    IncomingQueue.push_back(std::move(task));
+  }
+
+  exception_ptr_t& GetException() { return ExceptionPtr; }
+
+  ~TaskHolder() {
+    IsClosure = true;
+    Thread.join();
+  }
+};
+
+}  // namespace task_manager
+}  // namespace manavrion

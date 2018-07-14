@@ -9,6 +9,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Add source to this project's executable.
-add_executable (taskmanager "task_manager.cpp" "task_manager.h")
+add_executable (taskmanager "tests.cpp" "task_manager.h")
 
 # TODO: Add tests and install targets if needed.
